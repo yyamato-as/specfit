@@ -1,0 +1,170 @@
+from astroquery.linelists.cdms import CDMS
+import astropy.units as u
+import astropy.constants as ac
+import numpy as np
+from scipy.interpolate import interp1d
+
+h = ac.h.cgs.value
+c = ac.c.cgs.value
+k_B = ac.k_B.cgs.value
+
+
+class PartitionFunction:
+    def __init__(self, species, T, Q, database=None, ntrans=None):
+        self.species = species
+        self.T = T
+        self.Q = Q
+        self.database = database
+        self.ntrans = ntrans
+
+        self.function = self._get_function()
+
+    def __call__(self, T):
+        if T < np.nanmin(self.T) or T > np.nanmax(self.T):
+            print(
+                "Warning: Input temperature is smaller or larger than the original partition function data. Will be evaluated by extrapolation."
+            )
+        val = self.function(T)
+        if val.size == 1:
+            return float(val)
+        else:
+            return val
+
+    def _get_function(self):
+        T = self.T[~np.isnan(self.Q)]
+        Q = self.Q[~np.isnan(self.Q)]
+        return interp1d(T, Q, kind="cubic", fill_value="extrapolate")
+
+
+def wavenumber_to_Kelvin(wavenumber):
+    return wavenumber * h * c / k_B
+
+
+class SpectroscopicData:
+
+    def __init__(self) -> None:
+        pass
+
+    def _set_quantities(self):
+        self.mu = self.table.meta["Molecular Weight"]
+        self.Q = self.table.meta["Partition Function"]
+        self.nu0 = self.table["Frequency"].value * 1e9
+        self.Aul = self.table["A_ul"].value
+        self.gup = self.table["g_up"].value
+        self.Eup = self.table["E_up"].value
+
+    @staticmethod
+    def read_CDMS_partition_function(species_table, tag):
+        row = species_table[species_table["tag"] == tag]
+
+        T = np.array(
+            [float(k.split("(")[-1].split(")")[0]) for k in row.keys() if "lg" in k]
+        )
+        Q = 10 ** np.array(
+            [float(row[k][0]) or np.nan for k in row.keys() if "lg" in k]
+        )
+
+        return T, Q
+
+    def quely_CDMS(
+        self, freq_range=(0.0, np.inf), species="", use_cached=False, nofreqerr=False
+    ):
+        # frequency range
+        numin, numax = freq_range
+
+        # clear preivous caches
+        CDMS.clear_cache()
+
+        # species
+        if species:
+            species_table = CDMS.get_species_table(use_cached=use_cached)
+            tag_list, species_list = (
+                species_table["tag"].tolist(),
+                species_table["molecule"].tolist(),
+            )
+            # look up tag list
+            try:
+                idx = species_list.index(species)
+            except ValueError:
+                raise ValueError(
+                    f"No entry found for {species}. Check the species list for existing entries."
+                )
+            # set the species with tag (zero-padding for 6 digits)
+            tag = tag_list[idx]
+            species = " ".join([str(tag).zfill(6), species])
+
+        self.response = CDMS.query_lines(
+            min_frequency=numin * u.Hz,
+            max_frequency=numax * u.Hz,
+            molecule=species,
+            temperature_for_intensity=0,  # hack to retrieve A coeff instead of logint
+        )
+
+        # copy for subsequent modification
+        self.table = self.response.copy()
+
+        # clean up resulting response
+        # 1. remove masked column
+        if self.table.mask is not None:
+            masked_columns = [
+                col for col in self.table.colnames if np.all(self.table.mask[col])
+            ]
+            self.table.remove_columns(masked_columns)
+        # 2. metadata (including partition function) if species is specified
+        if species:
+            self.tag, self.species = species.split(maxsplit=1)
+            self.molweight = np.unique(self.table["MOLWT"].value)
+            if len(self.molweight) > 1:
+                raise ValueError(
+                    "There are multiple values of molecular weight in the table. Check your input or query result."
+                )
+            self.molweight = self.molweight[0]
+            self.table.meta["Species"] = self.species
+            self.table.meta["Molecular Weight"] = self.molweight
+
+            # partition function
+            T, Q = self.read_CDMS_partition_function(
+                species_table=species_table, tag=int(self.tag)
+            )
+            self.table.meta["Partition Function"] = PartitionFunction(
+                species=self.species, T=T, Q=Q, ntrans=species_table["#lines"]
+            )
+
+        # 2. remove unnecessary columns
+        self.table.remove_columns(["DR", "TAG", "QNFMT", "MOLWT", "Lab"])
+        if nofreqerr:
+            self.table.remove_column("ERR")
+        self.table.add_column(col=self.table["name"], name="Species", index=0)
+        self.table.remove_column("name")
+
+        # 3. some calculus to make table values useful
+        # 3-1. rename frequency (and error) and to GHz
+        self.table.rename_column("FREQ", "Frequency")
+        self.table["Frequency"] *= 1e-3
+        self.table["Frequency"].unit = u.GHz
+        self.table["Frequency"].format = "{:.7f}"
+        if not nofreqerr:
+            self.table.rename_column("ERR", "Frequency Error")
+            self.table["Frequency Error"] *= 1e-3
+            self.table["Frequency Error"].unit = u.GHz
+            self.table["Frequency Error"].format = "{:.7f}"
+
+        # 3-2. A coeff to not log
+        self.table.rename_column("LGAIJ", "A_ul")
+        self.table["A_ul"] = 10 ** self.table["A_ul"]
+        self.table["A_ul"].format = "{:.4e}"
+
+        # 3-3. E_low to E_up
+        self.table.rename_column("ELO", "E_up")
+        self.table["E_up"] = (
+            wavenumber_to_Kelvin(self.table["E_up"])
+            + h * self.table["Frequency"] * 1e9 / k_B
+        )
+        self.table["E_up"].unit = "K"
+        self.table["E_up"].format = "{:.5f}"
+
+        # 3-4. GUP to g_up
+        self.table.rename_column("GUP", "g_up")
+
+        # setup
+        self._set_quantities()
