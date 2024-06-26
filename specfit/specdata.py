@@ -82,7 +82,10 @@ class SpectroscopicData:
         pass
 
     def _set_quantities(self):
-        self.mu = self.table.meta["Molecular Weight"]
+        try:
+            self.mu = self.table.meta["Molecular Weight"]
+        except KeyError:
+            pass
         self.Q = self.table.meta["Partition Function"]
         self.nu0 = self.table["Frequency"].value * 1e9
         self.Aul = self.table["A_ul"].value
