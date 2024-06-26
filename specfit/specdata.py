@@ -260,10 +260,10 @@ class SpectroscopicData:
 
         # partition function
         T, Q = self.read_CDMS_partition_function(
-            species_table=species_table, tag=int(self.tag)
+            species_table=self.species_table, tag=int(self.tag)
         )
         self.table.meta["Partition Function"] = PartitionFunction(
-            species=self.species, T=T, Q=Q, ntrans=species_table["#lines"]
+            species=self.species, T=T, Q=Q, ntrans=self.species_table["#lines"]
         )
 
         # 2. remove unnecessary columns
