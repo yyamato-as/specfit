@@ -137,18 +137,11 @@ class SpectroscopicData:
             ]
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
-        ## get the specie name and molweight which are added to metadata table
+        ## get the specie name which are added to metadata table
         self.species_table = JPL.get_species_table()
         idx = self.species_table["TAG"].tolist().index(int(species_id))
         self.species = self.species_table["NAME"][idx]
-        self.molweight = np.unique(self.table["MOLWT"].value)
-        if len(self.molweight) > 1:
-            raise ValueError(
-                "There are multiple values of molecular weight in the table. Check your input or query result."
-            )
-        self.molweight = self.molweight[0]
         self.table.meta["Species"] = self.species
-        self.table.meta["Molecular Weight"] = self.molweight
 
         # partition function
         T, Q = self.read_JPL_partition_function(
@@ -159,7 +152,7 @@ class SpectroscopicData:
         )
 
         # 2. remove unnecessary columns
-        self.table.remove_columns(["DR", "TAG", "QNFMT", "MOLWT", "Lab"])
+        self.table.remove_columns(["DR", "TAG", "QNFMT"])
         if nofreqerr:
             self.table.remove_column("ERR")
         self.table.add_column(
