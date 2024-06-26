@@ -91,7 +91,7 @@ class SpectroscopicData:
 
     @staticmethod
     def read_JPL_partition_function(species_table, tag):
-        row = species_table[species_table["tag"] == tag]
+        row = species_table[species_table["TAG"] == tag]
 
         T = np.array(
             species_table.meta["Temperature (K)"][::-1]
