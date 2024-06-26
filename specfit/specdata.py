@@ -139,7 +139,7 @@ class SpectroscopicData:
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata of table
         self.species_table = JPL.get_species_table()
-        idx = self.species_table["TAG"].index(species_id)
+        idx = self.species_table["TAG"].tolist().index(species_id)
         self.species = self.species_table["NAME"][idx]
         self.molweight = np.unique(self.table["MOLWT"].value)
         if len(self.molweight) > 1:
