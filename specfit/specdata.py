@@ -178,7 +178,7 @@ class SpectroscopicData:
         self.table.rename_column("LGINT", "A_ul")
         self.table["A_ul"] = logint_to_EinsteinA(
             logint_300=self.table["A_ul"],
-            nu0=self.table["Frequency"],
+            nu0=self.table["Frequency"] * 1e3, # in MHz
             gup=self.table["GUP"],
             Elow=self.table["ELO"],
             Q_300=self.table.meta["Partition Function"](300)
