@@ -123,7 +123,7 @@ class SpectroscopicData:
         self.response = JPL.query_lines(
             min_frequency=numin * u.Hz,
             max_frequency=numax * u.Hz,
-            molecule=species_id,
+            molecule=int(species_id),
         )
 
         # copy for subsequent modification
@@ -137,9 +137,9 @@ class SpectroscopicData:
             ]
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
-        ## get the specie name and molweight which are added to metadata of table
+        ## get the specie name and molweight which are added to metadata table
         self.species_table = JPL.get_species_table()
-        idx = self.species_table["TAG"].tolist().index(species_id)
+        idx = self.species_table["TAG"].tolist().index(int(species_id))
         self.species = self.species_table["NAME"][idx]
         self.molweight = np.unique(self.table["MOLWT"].value)
         if len(self.molweight) > 1:
@@ -205,7 +205,7 @@ class SpectroscopicData:
         self._set_quantities()
 
     def query_CDMS(
-        self, freq_range=(0.0, np.inf), species="", use_cached=False, nofreqerr=False
+        self, freq_range=(0.0, np.inf), species_id="", use_cached=False, nofreqerr=False
     ):
         # frequency range
         numin, numax = freq_range
@@ -213,28 +213,28 @@ class SpectroscopicData:
         # clear preivous caches
         CDMS.clear_cache()
 
-        # species
-        if species:
-            species_table = CDMS.get_species_table(use_cached=use_cached)
-            tag_list, species_list = (
-                species_table["tag"].tolist(),
-                species_table["molecule"].tolist(),
-            )
-            # look up tag list
-            try:
-                idx = species_list.index(species)
-            except ValueError:
-                raise ValueError(
-                    f"No entry found for {species}. Check the species list for existing entries."
-                )
-            # set the species with tag (zero-padding for 6 digits)
-            tag = tag_list[idx]
-            species = " ".join([str(tag).zfill(6), species])
+        # # species
+        # if species:
+        #     species_table = CDMS.get_species_table(use_cached=use_cached)
+        #     tag_list, species_list = (
+        #         species_table["tag"].tolist(),
+        #         species_table["molecule"].tolist(),
+        #     )
+        #     # look up tag list
+        #     try:
+        #         idx = species_list.index(species)
+        #     except ValueError:
+        #         raise ValueError(
+        #             f"No entry found for {species}. Check the species list for existing entries."
+        #         )
+        #     # set the species with tag (zero-padding for 6 digits)
+        #     tag = tag_list[idx]
+        #     species = " ".join([str(tag).zfill(6), species])
 
         self.response = CDMS.query_lines(
             min_frequency=numin * u.Hz,
             max_frequency=numax * u.Hz,
-            molecule=species,
+            molecule=str(species_id).zfill(6),
             temperature_for_intensity=0,  # hack to retrieve A coeff instead of logint
         )
 
@@ -249,24 +249,26 @@ class SpectroscopicData:
             ]
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
-        if species:
-            self.tag, self.species = species.split(maxsplit=1)
-            self.molweight = np.unique(self.table["MOLWT"].value)
-            if len(self.molweight) > 1:
-                raise ValueError(
-                    "There are multiple values of molecular weight in the table. Check your input or query result."
-                )
-            self.molweight = self.molweight[0]
-            self.table.meta["Species"] = self.species
-            self.table.meta["Molecular Weight"] = self.molweight
+        ## get the specie name and molweight which are added to metadata table
+        self.species_table = CDMS.get_species_table(use_cached=use_cached)
+        idx = self.species_table["tag"].tolist().index(int(species_id))
+        self.species = self.species_table["molecule"][idx]
+        self.molweight = np.unique(self.table["MOLWT"].value)
+        if len(self.molweight) > 1:
+            raise ValueError(
+                "There are multiple values of molecular weight in the table. Check your input or query result."
+            )
+        self.molweight = self.molweight[0]
+        self.table.meta["Species"] = self.species
+        self.table.meta["Molecular Weight"] = self.molweight
 
-            # partition function
-            T, Q = self.read_CDMS_partition_function(
-                species_table=species_table, tag=int(self.tag)
-            )
-            self.table.meta["Partition Function"] = PartitionFunction(
-                species=self.species, T=T, Q=Q, ntrans=species_table["#lines"]
-            )
+        # partition function
+        T, Q = self.read_CDMS_partition_function(
+            species_table=species_table, tag=int(self.tag)
+        )
+        self.table.meta["Partition Function"] = PartitionFunction(
+            species=self.species, T=T, Q=Q, ntrans=species_table["#lines"]
+        )
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT", "MOLWT", "Lab"])
