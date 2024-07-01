@@ -141,19 +141,20 @@ class SpectroscopicData:
         ## get the specie name which are added to metadata table
         if species is None:
             tag = abs(int(np.unique(self.table["TAG"])[0]))
+            species_table = JPL.get_species_table()
             try:
-                idx = JPL.get_species_table()["TAG"].tolist().index(tag)
+                idx = species_table["TAG"].tolist().index(tag)
             except ValueError:
                 raise ValueError(f"No entries found for species tag {tag}. Please specify ``species'' argument.")
         
-            self.species = JPL.get_species_table()["NAME"][idx]
+            self.species = species_table["NAME"][idx]
 
             if pf is None:
                 T, Q = self.read_JPL_partition_function(
-                    species_table=JPL.get_species_table(), tag=tag
+                    species_table=species_table, tag=tag
                 )
                 self.table.meta["Partition Function"] = PartitionFunction(
-                    species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
+                    species=self.species, T=T, Q=Q, ntrans=species_table["NLINE"]
                 )
             else:
                 self.table.meta["Partition Function"] = pf
