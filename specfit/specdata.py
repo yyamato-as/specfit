@@ -97,7 +97,7 @@ class SpectroscopicData:
         self.Eup = self.table["E_up"].value
 
     
-    def add_partition_function(self, species_id):
+    # def add_partition_function(self, species_id):
 
     @staticmethod
     def read_JPL_partition_function(species_table, tag):
@@ -147,7 +147,7 @@ class SpectroscopicData:
                 raise ValueError(f"No entries found for species tag {tag}. Please specify ``species'' argument.")
         
             self.species = self.species_table["NAME"][idx]
-            
+
             if pf is None:
                 T, Q = self.read_JPL_partition_function(
                     species_table=JPL.get_species_table(), tag=tag
