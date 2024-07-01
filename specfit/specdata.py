@@ -226,16 +226,12 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata table
-        tag = abs(int(np.unique(self.table["TAG"])[0]))
+        self.molweight = int(np.unique(self.table["MOWT"])[0])
+        tag = int(self.molweight * 1e3 + abs(int(np.unique(self.table["TAG"])[0])))
         self.species_table = CDMS.get_species_table(use_cached=use_cached)
         idx = self.species_table["tag"].tolist().index(tag)
         self.species = self.species_table["molecule"][idx]
-        self.molweight = np.unique(self.table["MOLWT"].value)
-        if len(self.molweight) > 1:
-            raise ValueError(
-                "There are multiple values of molecular weight in the table. Check your input or query result."
-            )
-        self.molweight = self.molweight[0]
+
         self.table.meta["Species"] = self.species
         self.table.meta["Molecular Weight"] = self.molweight
 
@@ -357,7 +353,7 @@ class SpectroscopicData:
                 "GUP": 47,
                 "MOLWT": 51,
                 "TAG": 54,
-                "QNFMT": 58,
+                "QNFMT": 57,
                 "Ju": 61,
                 "Ku": 63,
                 "vu": 65,
