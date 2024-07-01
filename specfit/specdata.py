@@ -97,7 +97,7 @@ class SpectroscopicData:
         self.Eup = self.table["E_up"].value
 
     
-    # def parse_partition_function(self, species_id):
+    def add_partition_function(self, species_id):
 
     @staticmethod
     def read_JPL_partition_function(species_table, tag):
@@ -125,7 +125,7 @@ class SpectroscopicData:
 
         return T, Q
 
-    def format_JPL(self, response, species=None, nofreqerr=False):
+    def format_JPL(self, response, species=None, nofreqerr=False, pf=None):
 
         # copy for subsequent modification
         self.table = response
@@ -139,26 +139,30 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name which are added to metadata table
-        tag = abs(int(np.unique(self.table["TAG"])[0]))
         if species is None:
+            tag = abs(int(np.unique(self.table["TAG"])[0]))
             try:
-                self.species_table = JPL.get_species_table()
-                idx = self.species_table["TAG"].tolist().index(tag)
-                self.species = self.species_table["NAME"][idx]
-
-                # partition function
+                idx = JPL.get_species_table()["TAG"].tolist().index(tag)
+            except ValueError:
+                raise ValueError(f"No entries found for species tag {tag}. Please specify ``species'' argument.")
+        
+            self.species = self.species_table["NAME"][idx]
+            
+            if pf is None:
                 T, Q = self.read_JPL_partition_function(
-                    species_table=self.species_table, tag=tag
+                    species_table=JPL.get_species_table(), tag=tag
                 )
                 self.table.meta["Partition Function"] = PartitionFunction(
                     species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
                 )
-            except ValueError:
-                self.species = ""
-                print(f"Warning: No entries found for species tag {tag}. No partition function has been registered. Please specify ``species'' argument.")
+            else:
+                self.table.meta["Partition Function"] = pf
         
         else:
             self.species = species
+            if pf is None:
+                raise ValueError("Please provide parition function (pf) which is needed to calculate A coeff.")
+            self.table.meta["Partition Function"] = pf
 
         self.table.meta["Species"] = self.species
 
