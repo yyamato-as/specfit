@@ -4,6 +4,7 @@ import astropy.units as u
 import astropy.constants as ac
 import numpy as np
 from scipy.interpolate import interp1d
+from astropy.io import ascii
 
 h = ac.h.cgs.value
 c = ac.c.cgs.value
@@ -78,8 +79,11 @@ def logint_to_EinsteinA(logint_300, nu0, gup, Elow, Q_300):
 
 class SpectroscopicData:
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, filename=None, format=None):
+        self.filename = filename
+        self.format = format
+
+        self.parse_datafile(format=format)
 
     def _set_quantities(self):
         try:
@@ -91,6 +95,9 @@ class SpectroscopicData:
         self.Aul = self.table["A_ul"].value
         self.gup = self.table["g_up"].value
         self.Eup = self.table["E_up"].value
+
+    
+    # def parse_partition_function(self, species_id):
 
     @staticmethod
     def read_JPL_partition_function(species_table, tag):
@@ -118,19 +125,10 @@ class SpectroscopicData:
 
         return T, Q
 
-    def query_JPL(self, freq_range=(0.0, np.inf), species_id=1001, nofreqerr=False):
-        # frequency range in Hz
-        numin, numax = freq_range
-
-        # species
-        self.response = JPL.query_lines(
-            min_frequency=numin * u.Hz,
-            max_frequency=numax * u.Hz,
-            molecule=int(species_id),
-        )
+    def format_JPL(self, response, species_id=None, nofreqerr=False):
 
         # copy for subsequent modification
-        self.table = self.response.copy()
+        self.table = response
 
         # clean up resulting response
         # 1. remove masked column
@@ -141,18 +139,19 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name which are added to metadata table
-        self.species_table = JPL.get_species_table()
-        idx = self.species_table["TAG"].tolist().index(int(species_id))
-        self.species = self.species_table["NAME"][idx]
-        self.table.meta["Species"] = self.species
+        if species_id:
+            self.species_table = JPL.get_species_table()
+            idx = self.species_table["TAG"].tolist().index(int(species_id))
+            self.species = self.species_table["NAME"][idx]
+            self.table.meta["Species"] = self.species
 
-        # partition function
-        T, Q = self.read_JPL_partition_function(
-            species_table=self.species_table, tag=int(species_id)
-        )
-        self.table.meta["Partition Function"] = PartitionFunction(
-            species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
-        )
+            # partition function
+            T, Q = self.read_JPL_partition_function(
+                species_table=self.species_table, tag=int(species_id)
+            )
+            self.table.meta["Partition Function"] = PartitionFunction(
+                species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
+            )
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT"])
@@ -178,10 +177,10 @@ class SpectroscopicData:
         self.table.rename_column("LGINT", "A_ul")
         self.table["A_ul"] = logint_to_EinsteinA(
             logint_300=self.table["A_ul"],
-            nu0=self.table["Frequency"] * 1e3, # in MHz
+            nu0=self.table["Frequency"] * 1e3,  # in MHz
             gup=self.table["GUP"],
             Elow=self.table["ELO"],
-            Q_300=self.table.meta["Partition Function"](300)
+            Q_300=self.table.meta["Partition Function"](300),
         )
         self.table["A_ul"].format = "{:.4e}"
 
@@ -200,42 +199,9 @@ class SpectroscopicData:
         # setup
         self._set_quantities()
 
-    def query_CDMS(
-        self, freq_range=(0.0, np.inf), species_id="", use_cached=False, nofreqerr=False
-    ):
-        # frequency range
-        numin, numax = freq_range
-
-        # clear preivous caches
-        CDMS.clear_cache()
-
-        # # species
-        # if species:
-        #     species_table = CDMS.get_species_table(use_cached=use_cached)
-        #     tag_list, species_list = (
-        #         species_table["tag"].tolist(),
-        #         species_table["molecule"].tolist(),
-        #     )
-        #     # look up tag list
-        #     try:
-        #         idx = species_list.index(species)
-        #     except ValueError:
-        #         raise ValueError(
-        #             f"No entry found for {species}. Check the species list for existing entries."
-        #         )
-        #     # set the species with tag (zero-padding for 6 digits)
-        #     tag = tag_list[idx]
-        #     species = " ".join([str(tag).zfill(6), species])
-
-        self.response = CDMS.query_lines(
-            min_frequency=numin * u.Hz,
-            max_frequency=numax * u.Hz,
-            molecule=str(species_id).zfill(6),
-            temperature_for_intensity=0,  # hack to retrieve A coeff instead of logint
-        )
-
+    def format_CDMS(self, response, species_id=None, use_cached=False, nofreqerr=False):
         # copy for subsequent modification
-        self.table = self.response.copy()
+        self.table = response
 
         # clean up resulting response
         # 1. remove masked column
@@ -246,25 +212,26 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata table
-        self.species_table = CDMS.get_species_table(use_cached=use_cached)
-        idx = self.species_table["tag"].tolist().index(int(species_id))
-        self.species = self.species_table["molecule"][idx]
-        self.molweight = np.unique(self.table["MOLWT"].value)
-        if len(self.molweight) > 1:
-            raise ValueError(
-                "There are multiple values of molecular weight in the table. Check your input or query result."
-            )
-        self.molweight = self.molweight[0]
-        self.table.meta["Species"] = self.species
-        self.table.meta["Molecular Weight"] = self.molweight
+        if species_id:
+            self.species_table = CDMS.get_species_table(use_cached=use_cached)
+            idx = self.species_table["tag"].tolist().index(int(species_id))
+            self.species = self.species_table["molecule"][idx]
+            self.molweight = np.unique(self.table["MOLWT"].value)
+            if len(self.molweight) > 1:
+                raise ValueError(
+                    "There are multiple values of molecular weight in the table. Check your input or query result."
+                )
+            self.molweight = self.molweight[0]
+            self.table.meta["Species"] = self.species
+            self.table.meta["Molecular Weight"] = self.molweight
 
-        # partition function
-        T, Q = self.read_CDMS_partition_function(
-            species_table=self.species_table, tag=int(species_id)
-        )
-        self.table.meta["Partition Function"] = PartitionFunction(
-            species=self.species, T=T, Q=Q, ntrans=self.species_table["#lines"]
-        )
+            # partition function
+            T, Q = self.read_CDMS_partition_function(
+                species_table=self.species_table, tag=int(species_id)
+            )
+            self.table.meta["Partition Function"] = PartitionFunction(
+                species=self.species, T=T, Q=Q, ntrans=self.species_table["#lines"]
+            )
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT", "MOLWT", "Lab"])
@@ -304,3 +271,103 @@ class SpectroscopicData:
 
         # setup
         self._set_quantities()
+
+    def query_JPL(self, freq_range=(0.0, np.inf), species_id=1001, nofreqerr=False):
+        # frequency range in Hz
+        numin, numax = freq_range
+
+        # species
+        response = JPL.query_lines(
+            min_frequency=numin * u.Hz,
+            max_frequency=numax * u.Hz,
+            molecule=int(species_id),
+        )
+
+        self.format_JPL(response=response, species_id=species_id, nofreqerr=nofreqerr)
+
+    def query_CDMS(
+        self, freq_range=(0.0, np.inf), species_id="", use_cached=False, nofreqerr=False
+    ):
+        # frequency range
+        numin, numax = freq_range
+
+        # clear preivous caches
+        CDMS.clear_cache()
+
+        response = CDMS.query_lines(
+            min_frequency=numin * u.Hz,
+            max_frequency=numax * u.Hz,
+            molecule=str(species_id).zfill(6),
+            temperature_for_intensity=0,  # hack to retrieve A coeff instead of logint
+        )
+
+        self.format_CDMS(
+            response=response,
+            species_id=species_id,
+            use_cached=use_cached,
+            nofreqerr=nofreqerr,
+        )
+
+    def parse_datafile(self, format="JPL"):
+
+        if format == "JPL":
+            response = ascii.read(
+                self.filename,
+                header_start=None,
+                data_start=0,
+                names=(
+                    "FREQ",
+                    "ERR",
+                    "LGINT",
+                    "DR",
+                    "ELO",
+                    "GUP",
+                    "TAG",
+                    "QNFMT",
+                    "QN'",
+                    'QN"',
+                ),
+                col_starts=(0, 13, 21, 29, 31, 41, 44, 51, 55, 67),
+                format="fixed_width",
+                fast_reader=False,
+            )
+
+            self.format_JPL(response=response)
+
+        elif format == "CDMS":
+            starts = {
+                "FREQ": 0,
+                "ERR": 14,
+                "LGINT": 25,
+                "DR": 36,
+                "ELO": 38,
+                "GUP": 47,
+                "MOLWT": 51,
+                "TAG": 54,
+                "QNFMT": 58,
+                "Ju": 61,
+                "Ku": 63,
+                "vu": 65,
+                "F1u": 67,
+                "F2u": 69,
+                "F3u": 71,
+                "Jl": 73,
+                "Kl": 75,
+                "vl": 77,
+                "F1l": 79,
+                "F2l": 81,
+                "F3l": 83,
+                "name": 89,
+            }
+
+            response = ascii.read(
+                self.filename,
+                header_start=None,
+                data_start=0,
+                names=list(starts.keys()),
+                col_starts=list(starts.values()),
+                format="fixed_width",
+                fast_reader=False,
+            )
+
+            self.format_CDMS(response=response)
