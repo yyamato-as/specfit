@@ -79,11 +79,11 @@ def logint_to_EinsteinA(logint_300, nu0, gup, Elow, Q_300):
 
 class SpectroscopicData:
 
-    def __init__(self, filename=None, format=None, species=None):
+    def __init__(self, filename=None, format=None, species=None, pf=None):
         self.filename = filename
         self.format = format
 
-        self.parse_datafile(format=format)
+        self.parse_datafile(format=format, species=species, pf=pf)
 
     def _set_quantities(self):
         try:
@@ -321,7 +321,7 @@ class SpectroscopicData:
             nofreqerr=nofreqerr,
         )
 
-    def parse_datafile(self, format="JPL", species=None):
+    def parse_datafile(self, format="JPL", species=None, pf=None):
 
         if format == "JPL":
             response = ascii.read(
@@ -345,7 +345,7 @@ class SpectroscopicData:
                 fast_reader=False,
             )
 
-            self.format_JPL(response=response, species=species)
+            self.format_JPL(response=response, species=species, pf=pf)
 
         elif format == "CDMS":
             starts = {
