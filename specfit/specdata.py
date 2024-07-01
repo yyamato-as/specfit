@@ -226,7 +226,7 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata table
-        self.molweight = int(np.unique(self.table["MOWT"])[0])
+        self.molweight = int(np.unique(self.table["MOLWT"])[0])
         tag = int(self.molweight * 1e3 + abs(int(np.unique(self.table["TAG"])[0])))
         self.species_table = CDMS.get_species_table(use_cached=use_cached)
         idx = self.species_table["tag"].tolist().index(tag)
