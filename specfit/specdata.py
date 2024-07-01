@@ -125,7 +125,7 @@ class SpectroscopicData:
 
         return T, Q
 
-    def format_JPL(self, response, species_id=None, nofreqerr=False):
+    def format_JPL(self, response, nofreqerr=False):
 
         # copy for subsequent modification
         self.table = response
@@ -139,19 +139,19 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name which are added to metadata table
-        if species_id:
-            self.species_table = JPL.get_species_table()
-            idx = self.species_table["TAG"].tolist().index(int(species_id))
-            self.species = self.species_table["NAME"][idx]
-            self.table.meta["Species"] = self.species
+        tag = int(np.unique(self.table["TAG"])[0])
+        self.species_table = JPL.get_species_table()
+        idx = self.species_table["TAG"].tolist().index(tag)
+        self.species = self.species_table["NAME"][idx]
+        self.table.meta["Species"] = self.species
 
-            # partition function
-            T, Q = self.read_JPL_partition_function(
-                species_table=self.species_table, tag=int(species_id)
-            )
-            self.table.meta["Partition Function"] = PartitionFunction(
-                species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
-            )
+        # partition function
+        T, Q = self.read_JPL_partition_function(
+            species_table=self.species_table, tag=tag
+        )
+        self.table.meta["Partition Function"] = PartitionFunction(
+            species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
+        )
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT"])
@@ -199,7 +199,7 @@ class SpectroscopicData:
         # setup
         self._set_quantities()
 
-    def format_CDMS(self, response, species_id=None, use_cached=False, nofreqerr=False):
+    def format_CDMS(self, response, use_cached=False, nofreqerr=False):
         # copy for subsequent modification
         self.table = response
 
@@ -212,26 +212,26 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata table
-        if species_id:
-            self.species_table = CDMS.get_species_table(use_cached=use_cached)
-            idx = self.species_table["tag"].tolist().index(int(species_id))
-            self.species = self.species_table["molecule"][idx]
-            self.molweight = np.unique(self.table["MOLWT"].value)
-            if len(self.molweight) > 1:
-                raise ValueError(
-                    "There are multiple values of molecular weight in the table. Check your input or query result."
-                )
-            self.molweight = self.molweight[0]
-            self.table.meta["Species"] = self.species
-            self.table.meta["Molecular Weight"] = self.molweight
+        tag = int(np.unique(self.table["TAG"])[0])
+        self.species_table = CDMS.get_species_table(use_cached=use_cached)
+        idx = self.species_table["tag"].tolist().index(tag)
+        self.species = self.species_table["molecule"][idx]
+        self.molweight = np.unique(self.table["MOLWT"].value)
+        if len(self.molweight) > 1:
+            raise ValueError(
+                "There are multiple values of molecular weight in the table. Check your input or query result."
+            )
+        self.molweight = self.molweight[0]
+        self.table.meta["Species"] = self.species
+        self.table.meta["Molecular Weight"] = self.molweight
 
-            # partition function
-            T, Q = self.read_CDMS_partition_function(
-                species_table=self.species_table, tag=int(species_id)
-            )
-            self.table.meta["Partition Function"] = PartitionFunction(
-                species=self.species, T=T, Q=Q, ntrans=self.species_table["#lines"]
-            )
+        # partition function
+        T, Q = self.read_CDMS_partition_function(
+            species_table=self.species_table, tag=tag
+        )
+        self.table.meta["Partition Function"] = PartitionFunction(
+            species=self.species, T=T, Q=Q, ntrans=self.species_table["#lines"]
+        )
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT", "MOLWT", "Lab"])
@@ -371,3 +371,6 @@ class SpectroscopicData:
             )
 
             self.format_CDMS(response=response)
+        
+        else:
+            raise ValueError("``format'' should be either ``JPL'' or ``CDMS''.")
