@@ -130,10 +130,6 @@ class SpectroscopicData:
         # copy for subsequent modification
         self.table = response
 
-        if not len(self.table):
-            print("No lines found in the specified frequency range.")
-            return
-
         # clean up resulting response
         # 1. remove masked column
         if self.table.mask is not None:
@@ -221,10 +217,6 @@ class SpectroscopicData:
         # copy for subsequent modification
         self.table = response
 
-        if not len(self.table):
-            print("No lines found in the specified frequency range.")
-            return
-
         # clean up resulting response
         # 1. remove masked column
         if self.table.mask is not None:
@@ -301,6 +293,10 @@ class SpectroscopicData:
             molecule=int(species_id),
         )
 
+        if response is None:
+            print("No lines found in the specified frequency range.")
+            return
+
         self.format_JPL(response=response, nofreqerr=nofreqerr)
 
     def query_CDMS(
@@ -318,6 +314,10 @@ class SpectroscopicData:
             molecule=str(species_id).zfill(6),
             temperature_for_intensity=0,  # hack to retrieve A coeff instead of logint
         )
+
+        if response is None:
+            print("No lines found in the specified frequency range.")
+            return
 
         self.format_CDMS(
             response=response,
