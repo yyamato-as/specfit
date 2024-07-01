@@ -130,6 +130,10 @@ class SpectroscopicData:
         # copy for subsequent modification
         self.table = response
 
+        if not len(self.table):
+            print("No lines found in the specified frequency range.")
+            return
+
         # clean up resulting response
         # 1. remove masked column
         if self.table.mask is not None:
@@ -216,6 +220,10 @@ class SpectroscopicData:
     def format_CDMS(self, response, use_cached=False, nofreqerr=False):
         # copy for subsequent modification
         self.table = response
+
+        if not len(self.table):
+            print("No lines found in the specified frequency range.")
+            return
 
         # clean up resulting response
         # 1. remove masked column
