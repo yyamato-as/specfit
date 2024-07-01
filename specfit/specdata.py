@@ -146,7 +146,7 @@ class SpectroscopicData:
             except ValueError:
                 raise ValueError(f"No entries found for species tag {tag}. Please specify ``species'' argument.")
         
-            self.species = self.species_table["NAME"][idx]
+            self.species = JPL.get_species_table()["NAME"][idx]
 
             if pf is None:
                 T, Q = self.read_JPL_partition_function(
