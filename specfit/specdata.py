@@ -79,7 +79,7 @@ def logint_to_EinsteinA(logint_300, nu0, gup, Elow, Q_300):
 
 class SpectroscopicData:
 
-    def __init__(self, filename=None, format=None):
+    def __init__(self, filename=None, format=None, species=None):
         self.filename = filename
         self.format = format
 
@@ -145,7 +145,6 @@ class SpectroscopicData:
                 self.species_table = JPL.get_species_table()
                 idx = self.species_table["TAG"].tolist().index(tag)
                 self.species = self.species_table["NAME"][idx]
-                self.table.meta["Species"] = self.species
 
                 # partition function
                 T, Q = self.read_JPL_partition_function(
@@ -155,12 +154,13 @@ class SpectroscopicData:
                     species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
                 )
             except ValueError:
+                self.species = ""
                 print(f"Warning: No entries found for species tag {tag}. No partition function has been registered. Please specify ``species'' argument.")
         
         else:
             self.species = species
-            self.table.meta["Species"] = self.species
 
+        self.table.meta["Species"] = self.species
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT"])
@@ -317,7 +317,7 @@ class SpectroscopicData:
             nofreqerr=nofreqerr,
         )
 
-    def parse_datafile(self, format="JPL"):
+    def parse_datafile(self, format="JPL", species=None):
 
         if format == "JPL":
             response = ascii.read(
@@ -341,7 +341,7 @@ class SpectroscopicData:
                 fast_reader=False,
             )
 
-            self.format_JPL(response=response)
+            self.format_JPL(response=response, species=species)
 
         elif format == "CDMS":
             starts = {
