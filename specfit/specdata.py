@@ -81,9 +81,9 @@ class SpectroscopicData:
 
     def __init__(self, filename=None, format=None, species=None, pf=None):
         self.filename = filename
-        self.format = format
 
-        self.parse_datafile(format=format, species=species, pf=pf)
+        if filename is not None:
+            self.parse_datafile(format=format, species=species, pf=pf)
 
     def _set_quantities(self):
         try:
