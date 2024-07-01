@@ -317,7 +317,6 @@ class SpectroscopicData:
 
         self.format_CDMS(
             response=response,
-            species_id=species_id,
             use_cached=use_cached,
             nofreqerr=nofreqerr,
         )
