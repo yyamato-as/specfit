@@ -125,7 +125,7 @@ class SpectroscopicData:
 
         return T, Q
 
-    def format_JPL(self, response, nofreqerr=False):
+    def format_JPL(self, response, species=None, nofreqerr=False):
 
         # copy for subsequent modification
         self.table = response
@@ -139,19 +139,28 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name which are added to metadata table
-        tag = int(np.unique(self.table["TAG"])[0])
-        self.species_table = JPL.get_species_table()
-        idx = self.species_table["TAG"].tolist().index(tag)
-        self.species = self.species_table["NAME"][idx]
-        self.table.meta["Species"] = self.species
+        tag = abs(int(np.unique(self.table["TAG"])[0]))
+        if species is None:
+            try:
+                self.species_table = JPL.get_species_table()
+                idx = self.species_table["TAG"].tolist().index(tag)
+                self.species = self.species_table["NAME"][idx]
+                self.table.meta["Species"] = self.species
 
-        # partition function
-        T, Q = self.read_JPL_partition_function(
-            species_table=self.species_table, tag=tag
-        )
-        self.table.meta["Partition Function"] = PartitionFunction(
-            species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
-        )
+                # partition function
+                T, Q = self.read_JPL_partition_function(
+                    species_table=self.species_table, tag=tag
+                )
+                self.table.meta["Partition Function"] = PartitionFunction(
+                    species=self.species, T=T, Q=Q, ntrans=self.species_table["NLINE"]
+                )
+            except ValueError:
+                print(f"Warning: No entries found for species tag {tag}. No partition function has been registered. Please specify ``species'' argument.")
+        
+        else:
+            self.species = species
+            self.table.meta["Species"] = self.species
+
 
         # 2. remove unnecessary columns
         self.table.remove_columns(["DR", "TAG", "QNFMT"])
@@ -212,7 +221,7 @@ class SpectroscopicData:
             self.table.remove_columns(masked_columns)
         # 2. metadata (including partition function) if species is specified
         ## get the specie name and molweight which are added to metadata table
-        tag = int(np.unique(self.table["TAG"])[0])
+        tag = abs(int(np.unique(self.table["TAG"])[0]))
         self.species_table = CDMS.get_species_table(use_cached=use_cached)
         idx = self.species_table["tag"].tolist().index(tag)
         self.species = self.species_table["molecule"][idx]
