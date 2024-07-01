@@ -296,7 +296,7 @@ class SpectroscopicData:
             molecule=int(species_id),
         )
 
-        self.format_JPL(response=response, species_id=species_id, nofreqerr=nofreqerr)
+        self.format_JPL(response=response, nofreqerr=nofreqerr)
 
     def query_CDMS(
         self, freq_range=(0.0, np.inf), species_id="", use_cached=False, nofreqerr=False
