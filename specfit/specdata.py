@@ -21,8 +21,8 @@ class PartitionFunction:
 
         self.function = self._get_function()
 
-    def __call__(self, T):
-        if T < np.nanmin(self.T) or T > np.nanmax(self.T):
+    def __call__(self, T, verbose=False):
+        if verbose and (T < np.nanmin(self.T) or T > np.nanmax(self.T)):
             print(
                 "Warning: Input temperature is smaller or larger than the original partition function data. Will be evaluated by extrapolation."
             )
