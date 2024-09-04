@@ -689,7 +689,7 @@ class EmceeHammer:
         if return_fig:
             return fig
 
-    def plot_walker(self, nburnin=100, labels=None, histogram=True):
+    def plot_walker(self, nburnin=100, labels=None, histogram=True, return_fig=False):
 
         sample = self.get_sample(thin=1, nburnin=0, flat=False).transpose(2, 0, 1)
         # Cycle through the plots.
@@ -752,7 +752,8 @@ class EmceeHammer:
 
         axes[-1].set_xlabel("Step Number")
 
-        # return fig
+        if return_fig:
+            return fig
 
 
 def condition(p, b):
