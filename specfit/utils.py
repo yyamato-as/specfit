@@ -14,6 +14,7 @@ from astropy.convolution import (
     Model1DKernel,
 )
 from .constants import c, k_B, h, ckms
+import pickle
 
 arcsec = np.pi / 180.0 / 3600.0  # in rad
 
@@ -579,15 +580,20 @@ class EmceeHammer:
         progress=True,
         blobs_dtype=None,
         save=True,
-        savefilename="test.h5",
+        savedir="./",
         name="mcmc",
     ):
 
         backend = None
 
         if save:
-            backend = emcee.backends.HDFBackend(savefilename, name=name)
+            backend = emcee.backends.HDFBackend(savedir + "fit.h5", name=name)
             backend.reset(self.nwalker, self.ndim)
+
+            # save parameters
+            if self.params is not None:
+                with open(savedir + "parameters.pkl", "wb") as f:
+                    pickle.dump(self.params, f)
 
         # set sampler
         self.sampler = emcee.EnsembleSampler(
